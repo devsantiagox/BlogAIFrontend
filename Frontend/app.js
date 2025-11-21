@@ -1,6 +1,6 @@
 // Configuración de la API
 // ⚠️ IMPORTANTE: Cambia esta URL por la URL de tu backend en Render
-const API_BASE_URL = 'https://your-backend-url.onrender.com';
+const API_BASE_URL = 'https://blogaibackend.onrender.com/';
 
 // Estado de la aplicación
 let currentUser = null;
