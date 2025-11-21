@@ -30,7 +30,10 @@ jobs:
       - name: Copy Frontend files
         run: |
           mkdir -p _site
-          cp -r Frontend/* _site/
+          # Copiar solo los archivos necesarios para el frontend (sin symlinks)
+          cp Frontend/index.html _site/
+          cp Frontend/app.js _site/
+          cp Frontend/styles.css _site/
           # Crear archivo .nojekyll para que GitHub Pages sirva los archivos estáticos
           touch _site/.nojekyll
 
