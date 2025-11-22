@@ -29,20 +29,55 @@ jobs:
 
       - name: Copy Frontend files
         run: |
+          # Limpiar directorio de salida si existe
+          rm -rf _site
           mkdir -p _site
-          # Copiar solo los archivos necesarios para el frontend (sin symlinks)
-          cp Frontend/index.html _site/
-          cp Frontend/app.js _site/
-          cp Frontend/styles.css _site/
-          # Crear archivo .nojekyll para que GitHub Pages sirva los archivos estáticos
-          touch _site/.nojekyll
+          
+          # Copiar archivos uno por uno para evitar problemas con symlinks
+          # Usar cat + redirección para crear archivos regulares
+          cat Frontend/index.html > _site/index.html
+          cat Frontend/app.js > _site/app.js
+          cat Frontend/styles.css > _site/styles.css
+          
+          # Crear archivo .nojekyll
+          echo "" > _site/.nojekyll
+          
+          # Verificar que todos los archivos son regulares (no symlinks)
+          if find _site -type l | grep -q .; then
+            echo "ERROR: Se encontraron symlinks"
+            find _site -type l
+            exit 1
+          fi
+          
+          # Verificar que los archivos existen
+          test -f _site/index.html || exit 1
+          test -f _site/app.js || exit 1
+          test -f _site/styles.css || exit 1
+          
+          # Mostrar información de los archivos
+          echo "Archivos listos para desplegar:"
+          ls -lh _site/
+          du -sh _site/
 
+      - name: Verify files before upload
+        run: |
+          # Verificar que los archivos existen y no son symlinks
+          if find _site -type l | grep -q .; then
+            echo "ERROR: Symlinks encontrados"
+            find _site -type l
+            exit 1
+          fi
+          echo "✓ No hay symlinks"
+          echo "Archivos a subir:"
+          find _site -type f -exec ls -lh {} \;
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: github-pages
           path: '_site'
           retention-days: 1
+          if-no-files-found: error
 
   deploy:
     needs: build
@@ -59,7 +94,19 @@ jobs:
         with:
           name: github-pages
           path: _site
-
+          
+      - name: Verify downloaded files
+        run: |
+          echo "Verificando archivos descargados:"
+          ls -la _site/
+          # Verificar que los archivos son regulares (no symlinks)
+          if find _site -type l | grep -q .; then
+            echo "ERROR: Symlinks encontrados en descarga"
+            find _site -type l
+            exit 1
+          fi
+          echo "✓ Todos los archivos son regulares (sin symlinks)"
+          
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
