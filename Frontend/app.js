@@ -1,6 +1,7 @@
 // Configuración de la API
 // ⚠️ IMPORTANTE: Cambia esta URL por la URL de tu backend en Render
 // Para desarrollo local, usa: http://localhost:8000
+// Actualizado: Corrección de doble barra en URLs y CORS
 const API_BASE_URL = 'https://blogaibackend.onrender.com';
 
 // Función helper para construir URLs del API correctamente
