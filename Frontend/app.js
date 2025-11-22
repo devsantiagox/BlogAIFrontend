@@ -3,11 +3,14 @@
 // Para desarrollo local, usa: http://localhost:8000
 const API_BASE_URL = 'https://blogaibackend.onrender.com';
 
-// Función helper para construir URLs del API asegurando que termine con /
+// Función helper para construir URLs del API correctamente
 function getApiUrl(endpoint) {
-    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL : API_BASE_URL + '/';
-    const path = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-    return base + path;
+    // Remover cualquier barra final de la base URL
+    const base = API_BASE_URL.replace(/\/+$/, '');
+    // Remover cualquier barra inicial del endpoint
+    const path = endpoint.replace(/^\/+/, '');
+    // Combinar con una sola barra
+    return `${base}/${path}`;
 }
 
 // Estado de la aplicación
