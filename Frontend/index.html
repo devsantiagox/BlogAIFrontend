@@ -14,6 +14,7 @@
         <header>
             <h1>🤖 AI-Blog</h1>
             <p class="subtitle">Genera artículos increíbles con Inteligencia Artificial</p>
+            <p class="version">v1.0.0</p>
             <div id="user-info" class="user-info hidden">
                 <span id="user-email"></span>
                 <button id="logout-btn" class="btn btn-secondary">Cerrar Sesión</button>
@@ -52,11 +53,12 @@
                         <label for="register-email">Email:</label>
                         <input type="email" id="register-email" required placeholder="tu@email.com">
                     </div>
-                    <div class="form-group">
-                        <label for="register-password">Contraseña:</label>
-                        <input type="password" id="register-password" required minlength="6"
-                            placeholder="Mínimo 6 caracteres">
-                    </div>
+                <div class="form-group">
+                    <label for="register-password">Contraseña:</label>
+                    <input type="password" id="register-password" required minlength="6"
+                        placeholder="Mínimo 6 caracteres">
+                    <small class="form-hint">La contraseña debe tener al menos 6 caracteres</small>
+                </div>
                     <button type="submit" class="btn btn-primary">Registrarse</button>
                 </form>
                 <div id="register-error" class="error-message hidden"></div>
@@ -70,9 +72,12 @@
             <form id="generate-form">
                 <div class="form-group">
                     <label for="prompt">Describe el tema del artículo que quieres generar:</label>
-                    <textarea id="prompt" rows="4"
+                    <textarea id="prompt" rows="4" maxlength="500"
                         placeholder="Ejemplo: Escribe sobre las ventajas de la inteligencia artificial en la educación moderna"
                         required></textarea>
+                    <small class="form-hint">
+                        <span id="prompt-char-count">0</span>/500 caracteres
+                    </small>
                 </div>
                 <button type="submit" class="btn btn-primary btn-large" id="generate-btn">
                     <span id="generate-btn-text">🚀 Generar Artículo</span>
@@ -90,6 +95,14 @@
                 <div class="loading" id="posts-loading">Cargando artículos...</div>
             </div>
         </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p class="footer-text">
+                Desarrollado con ❤️ por <strong>Santiago Ruiz</strong>
+            </p>
+            <p class="footer-subtext">Powered by Gemini AI</p>
+        </footer>
     </div>
 
     <script src="app.js"></script>

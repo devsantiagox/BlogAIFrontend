@@ -1,6 +1,14 @@
 // Configuración de la API
 // ⚠️ IMPORTANTE: Cambia esta URL por la URL de tu backend en Render
-const API_BASE_URL = 'https://blogaibackend.onrender.com/';
+// Para desarrollo local, usa: http://localhost:8000
+const API_BASE_URL = 'https://blogaibackend.onrender.com';
+
+// Función helper para construir URLs del API asegurando que termine con /
+function getApiUrl(endpoint) {
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL : API_BASE_URL + '/';
+    const path = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    return base + path;
+}
 
 // Estado de la aplicación
 let currentUser = null;
@@ -11,7 +19,23 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     setupEventListeners();
     loadPosts();
+    checkBackendConnection();
 });
+
+// Verificar conexión con el backend
+async function checkBackendConnection() {
+    try {
+        const response = await fetch(getApiUrl('health'));
+        if (response.ok) {
+            console.log('✅ Backend conectado correctamente');
+        } else {
+            console.warn('⚠️ Backend responde pero con errores');
+        }
+    } catch (error) {
+        console.error('❌ No se pudo conectar con el backend:', error.message);
+        showToast('No se pudo conectar con el backend. Verifica que esté corriendo.', 'error');
+    }
+}
 
 // Verificar si el usuario está autenticado
 function checkAuth() {
@@ -48,6 +72,37 @@ function setupEventListeners() {
     
     // Botón de logout
     document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+    // Validación en tiempo real del prompt
+    const promptTextarea = document.getElementById('prompt');
+    if (promptTextarea) {
+        promptTextarea.addEventListener('input', () => {
+            const charCount = promptTextarea.value.length;
+            const charCountEl = document.getElementById('prompt-char-count');
+            if (charCountEl) {
+                charCountEl.textContent = charCount;
+                if (charCount > 450) {
+                    charCountEl.style.color = 'var(--error-color)';
+                } else if (charCount > 400) {
+                    charCountEl.style.color = '#f59e0b';
+                } else {
+                    charCountEl.style.color = 'var(--text-secondary)';
+                }
+            }
+        });
+    }
+
+    // Validación en tiempo real de contraseña
+    const registerPassword = document.getElementById('register-password');
+    if (registerPassword) {
+        registerPassword.addEventListener('input', validatePasswordStrength);
+    }
+
+    // Validación de email en tiempo real
+    document.querySelectorAll('input[type="email"]').forEach(input => {
+        input.addEventListener('blur', validateEmail);
+        input.addEventListener('input', clearFieldError);
+    });
 }
 
 // Cambiar entre tabs de login/register
@@ -74,21 +129,115 @@ function clearMessages() {
     });
 }
 
+// Validar email
+function validateEmail(e) {
+    const emailInput = e.target;
+    const email = emailInput.value.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (email && !emailRegex.test(email)) {
+        showFieldError(emailInput, 'Por favor ingresa un email válido');
+        return false;
+    }
+    clearFieldError(e);
+    return true;
+}
+
+// Validar fortaleza de contraseña
+function validatePasswordStrength(e) {
+    const passwordInput = e.target;
+    const password = passwordInput.value;
+    const hint = passwordInput.parentElement.querySelector('.form-hint');
+    
+    if (!hint) return;
+    
+    if (password.length < 6) {
+        hint.textContent = 'La contraseña debe tener al menos 6 caracteres';
+        hint.style.color = 'var(--error-color)';
+        passwordInput.style.borderColor = 'var(--error-color)';
+    } else if (password.length < 8) {
+        hint.textContent = 'Contraseña débil - Usa al menos 8 caracteres para mayor seguridad';
+        hint.style.color = '#f59e0b';
+        passwordInput.style.borderColor = '#f59e0b';
+    } else {
+        hint.textContent = '✓ Contraseña válida';
+        hint.style.color = 'var(--success-color)';
+        passwordInput.style.borderColor = 'var(--success-color)';
+    }
+}
+
+// Mostrar error en campo
+function showFieldError(input, message) {
+    clearFieldError({ target: input });
+    input.style.borderColor = 'var(--error-color)';
+    const errorMsg = document.createElement('small');
+    errorMsg.className = 'field-error';
+    errorMsg.textContent = message;
+    errorMsg.style.color = 'var(--error-color)';
+    errorMsg.style.display = 'block';
+    errorMsg.style.marginTop = '5px';
+    input.parentElement.appendChild(errorMsg);
+}
+
+// Limpiar error de campo
+function clearFieldError(e) {
+    const input = e.target || e;
+    input.style.borderColor = '';
+    const errorMsg = input.parentElement.querySelector('.field-error');
+    if (errorMsg) {
+        errorMsg.remove();
+    }
+}
+
+// Mostrar alerta toast
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 // Manejar login
 async function handleLogin(e) {
     e.preventDefault();
     clearMessages();
     
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+    const emailInput = document.getElementById('login-email');
+    const passwordInput = document.getElementById('login-password');
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
     const errorDiv = document.getElementById('login-error');
+    
+    // Validaciones del lado del cliente
+    if (!email) {
+        showFieldError(emailInput, 'El email es requerido');
+        return;
+    }
+    
+    if (!validateEmail({ target: emailInput })) {
+        return;
+    }
+    
+    if (!password) {
+        showFieldError(passwordInput, 'La contraseña es requerida');
+        return;
+    }
     
     try {
         const formData = new FormData();
         formData.append('username', email);
         formData.append('password', password);
         
-        const response = await fetch(`${API_BASE_URL}/token`, {
+        const response = await fetch(getApiUrl('token'), {
             method: 'POST',
             body: formData
         });
@@ -108,10 +257,21 @@ async function handleLogin(e) {
         
         showAuthenticatedView();
         document.getElementById('login-form-element').reset();
+        showToast('¡Bienvenido! Inicio de sesión exitoso', 'success');
         
     } catch (error) {
-        errorDiv.textContent = error.message;
+        let errorMessage = error.message || 'Error al iniciar sesión';
+        
+        // Mejorar mensajes de error específicos
+        if (errorMessage.includes('401') || errorMessage.includes('incorrectos')) {
+            errorMessage = 'Email o contraseña incorrectos. Verifica tus credenciales.';
+        } else if (errorMessage.includes('Network') || errorMessage.includes('Failed to fetch')) {
+            errorMessage = 'No se pudo conectar con el servidor. Verifica que el backend esté corriendo.';
+        }
+        
+        errorDiv.textContent = errorMessage;
         errorDiv.classList.remove('hidden');
+        showToast(errorMessage, 'error');
     }
 }
 
@@ -120,13 +280,35 @@ async function handleRegister(e) {
     e.preventDefault();
     clearMessages();
     
-    const email = document.getElementById('register-email').value;
-    const password = document.getElementById('register-password').value;
+    const emailInput = document.getElementById('register-email');
+    const passwordInput = document.getElementById('register-password');
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
     const errorDiv = document.getElementById('register-error');
     const successDiv = document.getElementById('register-success');
     
+    // Validaciones del lado del cliente
+    if (!email) {
+        showFieldError(emailInput, 'El email es requerido');
+        return;
+    }
+    
+    if (!validateEmail({ target: emailInput })) {
+        return;
+    }
+    
+    if (!password) {
+        showFieldError(passwordInput, 'La contraseña es requerida');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showFieldError(passwordInput, 'La contraseña debe tener al menos 6 caracteres');
+        return;
+    }
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/register`, {
+        const response = await fetch(getApiUrl('register'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -139,19 +321,33 @@ async function handleRegister(e) {
             throw new Error(error.detail || 'Error al registrar usuario');
         }
         
-        successDiv.textContent = '¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.';
+        successDiv.textContent = '¡Cuenta creada exitosamente! Redirigiendo al login...';
         successDiv.classList.remove('hidden');
+        showToast('¡Cuenta creada exitosamente!', 'success');
         document.getElementById('register-form-element').reset();
         
         // Cambiar a tab de login después de 2 segundos
         setTimeout(() => {
             switchTab('login');
             document.getElementById('login-email').value = email;
+            showToast('Ya puedes iniciar sesión con tu nueva cuenta', 'info');
         }, 2000);
         
     } catch (error) {
-        errorDiv.textContent = error.message;
+        let errorMessage = error.message || 'Error al registrar usuario';
+        
+        // Mejorar mensajes de error específicos
+        if (errorMessage.includes('ya está registrado') || errorMessage.includes('already')) {
+            errorMessage = 'Este email ya está registrado. Por favor inicia sesión.';
+        } else if (errorMessage.includes('Network') || errorMessage.includes('Failed to fetch')) {
+            errorMessage = 'No se pudo conectar con el servidor. Verifica que el backend esté corriendo.';
+        } else if (errorMessage.includes('400')) {
+            errorMessage = 'Datos inválidos. Verifica que el email y contraseña sean correctos.';
+        }
+        
+        errorDiv.textContent = errorMessage;
         errorDiv.classList.remove('hidden');
+        showToast(errorMessage, 'error');
     }
 }
 
@@ -160,20 +356,38 @@ async function handleGeneratePost(e) {
     e.preventDefault();
     clearMessages();
     
-    const prompt = document.getElementById('prompt').value;
+    const promptInput = document.getElementById('prompt');
+    const prompt = promptInput.value.trim();
     const errorDiv = document.getElementById('generate-error');
     const successDiv = document.getElementById('generate-success');
     const generateBtn = document.getElementById('generate-btn');
     const generateBtnText = document.getElementById('generate-btn-text');
     const generateBtnLoading = document.getElementById('generate-btn-loading');
     
+    // Validaciones del lado del cliente
+    if (!prompt) {
+        showFieldError(promptInput, 'Por favor describe el tema del artículo');
+        return;
+    }
+    
+    if (prompt.length < 10) {
+        showFieldError(promptInput, 'El prompt debe tener al menos 10 caracteres');
+        return;
+    }
+    
+    if (prompt.length > 500) {
+        showFieldError(promptInput, 'El prompt no puede exceder 500 caracteres');
+        return;
+    }
+    
     // Deshabilitar botón y mostrar loading
     generateBtn.disabled = true;
     generateBtnText.classList.add('hidden');
     generateBtnLoading.classList.remove('hidden');
+    showToast('Generando tu artículo... Esto puede tomar unos segundos', 'info');
     
     try {
-        const response = await fetch(`${API_BASE_URL}/generate-post`, {
+        const response = await fetch(getApiUrl('generate-post'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -189,9 +403,17 @@ async function handleGeneratePost(e) {
         
         const post = await response.json();
         
-        successDiv.textContent = '¡Artículo generado exitosamente!';
+        successDiv.textContent = '¡Artículo generado exitosamente! Revisa la sección de artículos.';
         successDiv.classList.remove('hidden');
+        showToast('¡Artículo generado exitosamente!', 'success');
         document.getElementById('generate-form').reset();
+        
+        // Resetear contador de caracteres
+        const charCountEl = document.getElementById('prompt-char-count');
+        if (charCountEl) {
+            charCountEl.textContent = '0';
+            charCountEl.style.color = 'var(--text-secondary)';
+        }
         
         // Recargar posts
         loadPosts();
@@ -202,8 +424,22 @@ async function handleGeneratePost(e) {
         }, 500);
         
     } catch (error) {
-        errorDiv.textContent = error.message;
+        let errorMessage = error.message || 'Error al generar el artículo';
+        
+        // Mejorar mensajes de error específicos
+        if (errorMessage.includes('429') || errorMessage.includes('cuota') || errorMessage.includes('quota')) {
+            errorMessage = 'Se ha excedido la cuota de la API. Por favor espera unos minutos antes de intentar nuevamente.';
+        } else if (errorMessage.includes('401') || errorMessage.includes('no autorizado')) {
+            errorMessage = 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
+            setTimeout(() => {
+                handleLogout();
+                switchTab('login');
+            }, 2000);
+        }
+        
+        errorDiv.textContent = errorMessage;
         errorDiv.classList.remove('hidden');
+        showToast(errorMessage, 'error');
     } finally {
         // Rehabilitar botón
         generateBtn.disabled = false;
@@ -218,7 +454,7 @@ async function loadPosts() {
     container.innerHTML = '<div class="loading">Cargando artículos...</div>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/posts`);
+        const response = await fetch(getApiUrl('posts'));
         
         if (!response.ok) {
             throw new Error('Error al cargar los artículos');
@@ -240,13 +476,25 @@ async function loadPosts() {
         container.innerHTML = posts.map(post => createPostCard(post)).join('');
         
     } catch (error) {
+        let errorMsg = error.message || 'Error desconocido';
+        if (errorMsg.includes('Network') || errorMsg.includes('Failed to fetch')) {
+            errorMsg = 'No se pudo conectar con el servidor. Verifica que el backend esté corriendo.';
+        }
+        
         container.innerHTML = `
-            <div class="error-message">
-                <strong>Error al cargar los artículos:</strong><br>
-                ${error.message}<br>
-                <small style="margin-top: 10px; display: block;">Verifica que la URL del backend sea correcta en app.js</small>
+            <div class="error-message" style="text-align: center; padding: 30px;">
+                <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
+                <strong style="display: block; margin-bottom: 10px; font-size: 1.2rem;">Error al cargar los artículos</strong>
+                <p style="margin-bottom: 15px; color: var(--text-secondary);">${errorMsg}</p>
+                <small style="display: block; margin-bottom: 20px; color: var(--text-secondary);">
+                    Verifica que el backend esté corriendo en ${API_BASE_URL || 'http://localhost:8000'}
+                </small>
+                <button onclick="loadPosts()" class="btn btn-primary">
+                    🔄 Reintentar
+                </button>
             </div>
         `;
+        showToast('Error al cargar los artículos', 'error');
     }
 }
 
@@ -260,6 +508,11 @@ function createPostCard(post) {
         minute: '2-digit'
     });
     
+    // Formatear el cuerpo del post para respetar saltos de línea
+    const formattedBody = escapeHtml(post.body)
+        .replace(/\n\n/g, '</p><p>')  // Dobles saltos de línea = nuevos párrafos
+        .replace(/\n/g, '<br>');       // Saltos simples = <br>
+    
     return `
         <div class="post-card">
             <div class="post-header">
@@ -269,7 +522,7 @@ function createPostCard(post) {
                     <div>✍️ Autor #${post.author_id}</div>
                 </div>
             </div>
-            <div class="post-body">${escapeHtml(post.body)}</div>
+            <div class="post-body"><p>${formattedBody}</p></div>
             ${post.seo_keywords ? `
                 <div class="post-seo">
                     <div class="post-seo-label">🔍 Palabras clave SEO:</div>
@@ -304,12 +557,19 @@ function showUnauthenticatedView() {
 
 // Manejar logout
 function handleLogout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userEmail');
-    authToken = null;
-    currentUser = null;
-    showUnauthenticatedView();
-    document.getElementById('login-form-element').reset();
-    document.getElementById('register-form-element').reset();
-    clearMessages();
+    // Confirmación más amigable
+    const confirmLogout = confirm('¿Estás seguro de que deseas cerrar sesión?');
+    if (confirmLogout) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userEmail');
+        authToken = null;
+        currentUser = null;
+        showUnauthenticatedView();
+        document.getElementById('login-form-element').reset();
+        document.getElementById('register-form-element').reset();
+        clearMessages();
+        showToast('Sesión cerrada exitosamente', 'info');
+        // Scroll al inicio
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 }
