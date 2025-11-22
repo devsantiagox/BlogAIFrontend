@@ -27,25 +27,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy Frontend files
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Build and prepare files
         run: |
           # Limpiar directorio de salida si existe
           rm -rf _site
           mkdir -p _site
           
-          # Copiar archivos uno por uno para evitar problemas con symlinks
-          # Usar cat + redirección para crear archivos regulares
+          # Leer y escribir archivos usando cat para asegurar que son archivos regulares
+          # Esto evita cualquier problema con symlinks o hard links
           cat Frontend/index.html > _site/index.html
           cat Frontend/app.js > _site/app.js
           cat Frontend/styles.css > _site/styles.css
           
-          # Crear archivo .nojekyll
-          echo "" > _site/.nojekyll
+          # Crear archivo .nojekyll (vacío)
+          touch _site/.nojekyll
           
-          # Verificar que todos los archivos son regulares (no symlinks)
+          # Verificar que todos los archivos son regulares (no symlinks ni hard links)
+          echo "Verificando tipos de archivos:"
+          find _site -type f -exec ls -li {} \;
+          
+          # Verificar que no hay symlinks
           if find _site -type l | grep -q .; then
             echo "ERROR: Se encontraron symlinks"
             find _site -type l
+            exit 1
+          fi
+          
+          # Verificar que no hay hard links (todos deben tener inode único)
+          inode_count=$(find _site -type f -exec ls -i {} \; | awk '{print $1}' | sort -u | wc -l)
+          file_count=$(find _site -type f | wc -l)
+          if [ "$inode_count" -ne "$file_count" ]; then
+            echo "ERROR: Se encontraron hard links (inodes duplicados)"
             exit 1
           fi
           
@@ -54,30 +69,17 @@ jobs:
           test -f _site/app.js || exit 1
           test -f _site/styles.css || exit 1
           
-          # Mostrar información de los archivos
+          # Mostrar información final
+          echo "✓ Todos los archivos son regulares (sin symlinks ni hard links)"
           echo "Archivos listos para desplegar:"
           ls -lh _site/
+          echo "Tamaño total:"
           du -sh _site/
 
-      - name: Verify files before upload
-        run: |
-          # Verificar que los archivos existen y no son symlinks
-          if find _site -type l | grep -q .; then
-            echo "ERROR: Symlinks encontrados"
-            find _site -type l
-            exit 1
-          fi
-          echo "✓ No hay symlinks"
-          echo "Archivos a subir:"
-          find _site -type f -exec ls -lh {} \;
-          
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages
           path: '_site'
-          retention-days: 1
-          if-no-files-found: error
 
   deploy:
     needs: build
@@ -89,27 +91,6 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: github-pages
-          path: _site
-          
-      - name: Verify downloaded files
-        run: |
-          echo "Verificando archivos descargados:"
-          ls -la _site/
-          # Verificar que los archivos son regulares (no symlinks)
-          if find _site -type l | grep -q .; then
-            echo "ERROR: Symlinks encontrados en descarga"
-            find _site -type l
-            exit 1
-          fi
-          echo "✓ Todos los archivos son regulares (sin symlinks)"
-          
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
